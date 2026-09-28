@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Phác thảo 3D - Nhà phố 2 gian (Trần Hưng Đạo)</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+  #info {
+    position: absolute; top: 12px; left: 12px; z-index: 10;
+    background: rgba(0,0,0,0.55); color: #fff; padding: 10px 14px;
+    border-radius: 8px; font-size: 13px; line-height: 1.5; max-width: 262px;
+  }
+  #info b { color: #ffd479; }
+  #controls {
+    position: absolute; top: 12px; right: 12px; z-index: 10;
+    background: rgba(0,0,0,0.55); color: #fff; padding: 10px 14px;
+    border-radius: 8px; font-size: 13px;
+  }
+  #controls label { display: block; margin: 4px 0; cursor: pointer; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div id="info">
+  <b>Nhà phố 2 gian gộp</b><br />
+  • Kéo trái: xoay · Lăn: zoom · Kéo phải: dời<br />
+  <br />2 gian mở · lòng nhà sâu ~9m để decor<br />
+  1 bậc trước cửa → vỉa hè → đường
+</div>
+<div id="controls">
+  <label><input type="checkbox" id="toggleRoad" checked /> Đường &amp; vỉa hè</label>
+  <label><input type="checkbox" id="toggleIn" checked /> Đèn trong nhà</label>
+  <label><input type="checkbox" id="autoRotate" /> Tự xoay</label>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ============================================================
+//  NHÀ PHỐ 2 GIAN GỘP – TRẦN HƯNG ĐẠO
+//  Tầng 1 RỖNG (mở, sâu ~9m) để decor · Mặt tiền z=0, đường +z
+//  Cao độ: đường=0 · vỉa hè=0.12 · sàn nhà (1 bậc)=0.30
+// ============================================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc2d6e2);
+scene.fog = new THREE.Fog(0xc2d6e2, 55, 130);
+
+// near lớn hơn + far nhỏ lại -> tăng mạnh độ chính xác depth buffer (chống z-fighting)
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.5, 300);
+camera.position.set(7.5, 5.2, 14);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 3.4, 0);
+controls.maxPolarAngle = Math.PI / 2.05;
+controls.minDistance = 4;
+controls.maxDistance = 50;
+
+// --- Ánh sáng ---
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9aa3ab, 0.85));
+const sun = new THREE.DirectionalLight(0xfff3e0, 0.95);
+sun.position.set(8, 16, 13);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -18; sun.shadow.camera.right = 18;
+sun.shadow.camera.top = 20; sun.shadow.camera.bottom = -20;
+sun.shadow.camera.far = 70;
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+// --- Vật liệu (màu ước lượng theo ảnh) ---
+const M = {
+  wall:    new THREE.MeshStandardMaterial({ color: 0xd3cfc3, roughness: 0.96 }),
+  wall2:   new THREE.MeshStandardMaterial({ color: 0xc9c3b4, roughness: 0.97 }),
+  pier:    new THREE.MeshStandardMaterial({ color: 0xc8c1af, roughness: 0.96 }),
+  divide:  new THREE.MeshStandardMaterial({ color: 0xbeb6a3, roughness: 0.96 }),
+  intWall: new THREE.MeshStandardMaterial({ color: 0xb9b3a2, roughness: 0.98 }),
+  intBack: new THREE.MeshStandardMaterial({ color: 0x2a2822, roughness: 1.0 }),
+  intFloor:new THREE.MeshStandardMaterial({ color: 0x8a4f39, roughness: 0.95 }),
+  beam:    new THREE.MeshStandardMaterial({ color: 0x323238, roughness: 0.8 }),
+  balus:   new THREE.MeshStandardMaterial({ color: 0xe6e2d6, roughness: 0.88 }),
+  glass:   new THREE.MeshStandardMaterial({ color: 0x26303a, roughness: 0.2, metalness: 0.25, transparent: true, opacity: 0.72 }),
+  frame:   new THREE.MeshStandardMaterial({ color: 0x282a2e, roughness: 0.6 }),
+  ac:      new THREE.MeshStandardMaterial({ color: 0xe8e6de, roughness: 0.7 }),
+  shutBox: new THREE.MeshStandardMaterial({ color: 0x42444a, roughness: 0.6, metalness: 0.3 }),
+  shutSlat:new THREE.MeshStandardMaterial({ color: 0x8d8f95, roughness: 0.5, metalness: 0.45 }),
+  ironGate:new THREE.MeshStandardMaterial({ color: 0x34373d, roughness: 0.5, metalness: 0.55 }),
+  parapet: new THREE.MeshStandardMaterial({ color: 0xcbc4b3, roughness: 0.96 }),
+  tileSw:  new THREE.MeshStandardMaterial({ color: 0xa5624a, roughness: 0.95 }),   // vỉa hè (cam nhạt)
+  tileSw2: new THREE.MeshStandardMaterial({ color: 0x9a5a44, roughness: 0.95 }),
+  step:    new THREE.MeshStandardMaterial({ color: 0x774031, roughness: 0.95 }),   // bậc (cam ĐẬM hơn)
+  curb:    new THREE.MeshStandardMaterial({ color: 0xa9a399, roughness: 0.95 }),
+  road:    new THREE.MeshStandardMaterial({ color: 0x7d7f83, roughness: 1.0 }),
+  line:    new THREE.MeshStandardMaterial({ color: 0xc9c3b6, roughness: 1.0 }),
+  tank:    new THREE.MeshStandardMaterial({ color: 0x3f6ea5, roughness: 0.6 }),
+};
+
+// Biển "XUÂN 1989" bằng canvas texture
+function makeSignTexture(text) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 130;
+  const g = c.getContext('2d');
+  g.fillStyle = '#cac2ae'; g.fillRect(0, 0, 512, 130);
+  g.fillStyle = '#7d7563'; g.font = 'bold 66px Georgia';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 256, 68);
+  return new THREE.CanvasTexture(c);
+}
+const M_sign = new THREE.MeshStandardMaterial({ map: makeSignTexture('XUÂN 1989'), roughness: 0.92 });
+
+function box(w, h, d, mat, x, y, z, parent) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+  (parent || scene).add(m); return m;
+}
+function cyl(rt, rb, h, mat, x, y, z, parent, seg) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), mat);
+  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+  (parent || scene).add(m); return m;
+}
+
+// ============================================================
+//  KÍCH THƯỚC
+// ============================================================
+const sidePier = 0.20, DIV = 0.24, bayClear = 2.70;
+const HOUSE_W = sidePier*2 + DIV + bayClear*2;   // 6.04
+const INT_D = 9.0;                // lòng nhà sâu 9m để decor
+const GF_H = 3.5, F2_H = 2.8, PARA_H = 0.55;
+const BAL_PROJ = 1.55;
+const TOP = GF_H + F2_H;          // 6.3
+const cz = -INT_D / 2;            // -4.5 (mặt tiền tại z=0)
+const bayCx = DIV/2 + bayClear/2; // 1.47
+const pierCx = HOUSE_W/2 - sidePier/2;
+const Y_ROAD = 0.0, Y_SIDE = 0.12, Y_HOUSE = 0.30;
+
+// ============================================================
+//  NỀN: 1 BẬC – VỈA HÈ – ĐƯỜNG
+// ============================================================
+const ground = new THREE.Group(); scene.add(ground);
+const SW_W = 2.3;                 // vỉa hè ngắn lại cho sát thực tế
+// BẬC trước cửa: mặt bậc TO hơn, cam đậm; nhô ra 1.15m
+const treadD = 1.15;
+box(HOUSE_W + 1.0, Y_HOUSE, treadD, M.step, 0, Y_HOUSE/2, treadD/2, ground);
+// VỈA HÈ (cao 0.12) ngay sau bậc
+const swZ0 = treadD, swZ1 = swZ0 + SW_W;
+box(46, Y_SIDE, SW_W, M.tileSw, 0, Y_SIDE/2, (swZ0+swZ1)/2, ground);
+for (let z = swZ0+0.5; z < swZ1; z += 0.7) box(46, 0.006, 0.02, M.tileSw2, 0, Y_SIDE+0.005, z, ground);
+// BÓ VỈA + ĐƯỜNG
+box(46, Y_SIDE + 0.06, 0.16, M.curb, 0, (Y_SIDE+0.06)/2, swZ1 + 0.08, ground);
+box(46, 0.2, 14, M.road, 0, -0.1, swZ1 + 7.2, ground);
+for (let i = -20; i <= 20; i += 3) box(1.4, 0.03, 0.16, M.line, i, 0.02, swZ1 + 5.5, ground);
+
+// ============================================================
+//  NHÀ CHÍNH  (nhóm đặt trên cao độ sàn nhà)
+// ============================================================
+const house = new THREE.Group(); house.position.y = Y_HOUSE; scene.add(house);
+
+// ---------- TẦNG 1: KHÔNG GIAN RỖNG ĐỂ DECOR ----------
+// Tường tầng 1 CAO ĐÚNG GF_H (không lồng lên khối tầng 2) và mặt bên THỤT VÀO 0.05
+//  -> mặt bên tầng 1 & mặt bên khối tầng 2 KHÔNG còn trùng phẳng (hết nhấp nháy 2 bên)
+const wt = 0.2;
+const sideX = HOUSE_W/2 - 0.05 - wt/2;   // tường bên thụt vào 5cm
+box(HOUSE_W - 0.1, 0.06, INT_D, M.intFloor, 0, 0.0, cz, house);   // sàn gạch đỏ
+box(wt, GF_H, INT_D, M.intWall, -sideX, GF_H/2, cz, house);       // tường trái
+box(wt, GF_H, INT_D, M.intWall,  sideX, GF_H/2, cz, house);       // tường phải
+box(DIV, GF_H, INT_D - 0.3, M.divide, 0, GF_H/2, cz - 0.15, house); // tường chia giữa
+box(HOUSE_W + 0.1, GF_H, 0.3, M.intBack, 0, GF_H/2, -9.12, house);  // tường hậu (bọc mặt sau)
+// đèn trong nhà (mỗi gian 1) để nhìn thấy chỗ decor
+const inLights = new THREE.Group(); house.add(inLights);
+[-bayCx, bayCx].forEach(x => {
+  const pl = new THREE.PointLight(0xffe6bd, 0.8, 14, 2); pl.position.set(x, GF_H - 0.4, -3.5); inLights.add(pl);
+  cyl(0.18, 0.18, 0.08, M.ac, x, GF_H - 0.15, -3.5, inLights, 12); // ốp đèn trần
+});
+
+// ---------- MẶT TIỀN TẦNG 1: trụ + cửa mở ----------
+// trụ mặt tiền cao đúng GF_H (đáy khối tầng 2 úp lên = mặt ĐỐI hướng, không tranh chấp)
+box(sidePier, GF_H, 0.4, M.pier, -pierCx, GF_H/2, 0.12, house);
+box(sidePier, GF_H, 0.4, M.pier,  pierCx, GF_H/2, 0.12, house);
+box(DIV + 0.02, GF_H, 0.42, M.divide, 0, GF_H/2, 0.14, house);   // trụ chia giữa
+// dầm lintel đỡ ban công (đen) suốt mặt tiền
+box(HOUSE_W + 0.12, 0.36, 0.46, M.beam, 0, GF_H + 0.03, 0.14, house);
+
+// ---------- CỬA SẮT XẾP – CẢ 2 GIAN, MỞ GẤP VỀ 2 BÊN ----------
+function foldStack(xEdge, dir) {              // chồng nan sắt đã gấp ở 1 mép
+  const n = 7, h = GF_H - 0.25;              // cao gần sát lintel (hết hở đầu cửa)
+  for (let i = 0; i < n; i++)
+    box(0.035, h, 0.05, M.ironGate, xEdge + dir*(0.05 + i*0.052), h/2 + 0.1, 0.26, house);
+  for (let i = 0; i < 3; i++)                 // vài thanh chéo gợi kiểu cửa xếp
+    box(0.42, 0.03, 0.045, M.ironGate, xEdge + dir*0.2, 0.7 + i*1.0, 0.28, house);
+}
+[-bayCx, bayCx].forEach(bc => {
+  const L = bc - bayClear/2, R = bc + bayClear/2;
+  foldStack(L, +1);                           // gấp ở mép trái, xếp vào trong
+  foldStack(R, -1);                           // gấp ở mép phải, xếp vào trong
+  box(bayClear, 0.08, 0.06, M.ironGate, bc, GF_H - 0.18, 0.28, house); // ray trên (sát lintel, hết hở)
+  box(bayClear, 0.05, 0.06, M.ironGate, bc, 0.12, 0.28, house);        // ray dưới
+});
+
+// ============================================================
+//  TẦNG 2 (khối đặc) + BAN CÔNG + MẶT TIỀN
+// ============================================================
+// khối tầng 2: kéo sâu thêm 0.4 (mặt sau -9.4, KHÔNG trùng tường hậu) & giữ facade tại z=0
+box(HOUSE_W, F2_H, INT_D + 0.4, M.wall, 0, GF_H + F2_H/2, -(INT_D + 0.4)/2, house);
+
+// --- Ban công + lan can con tiện ---
+const balY = GF_H + 0.24;
+// sàn ban công: kéo mép sau lùi -0.1 vào tường (không trùng mặt facade z=0)
+box(HOUSE_W, 0.2, BAL_PROJ + 0.1, M.wall, 0, balY, (BAL_PROJ - 0.1)/2, house);
+const bz = BAL_PROJ - 0.05;
+box(HOUSE_W, 0.2, 0.16, M.beam, 0, balY - 0.02, bz, house);
+function baluster(x, z, parent) {
+  const g = new THREE.Group();
+  cyl(0.04, 0.055, 0.8, M.balus, 0, 0.4, 0, g, 8);
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.072, 8, 8), M.balus);
+  belly.position.y = 0.4; g.add(belly);
+  g.position.set(x, balY + 0.12, z); parent.add(g);
+}
+function railing(x0, z0, x1, z1, parent) {
+  const len = Math.hypot(x1-x0, z1-z0);
+  const n = Math.max(2, Math.round(len / 0.16));
+  const mx=(x0+x1)/2, mz=(z0+z1)/2, ang=Math.atan2(z1-z0, x1-x0);
+  [0.04, 0.92].forEach(hy => {
+    const r = box(len, 0.08, 0.1, M.balus, 0, 0, 0, parent);
+    r.position.set(mx, balY + 0.12 + hy, mz); r.rotation.y = -ang;
+  });
+  for (let i=0;i<=n;i++) baluster(x0+(x1-x0)*i/n, z0+(z1-z0)*i/n, parent);
+}
+const rail = new THREE.Group(); house.add(rail);
+const bxx = HOUSE_W/2 - 0.05;
+// lan can: hông DỪNG trước góc 0.18 để KHÔNG trùng con tiện ở góc với lan can mặt trước
+railing(-bxx, bz, bxx, bz, rail);
+railing(-bxx, 0.12, -bxx, bz - 0.18, rail);
+railing( bxx, 0.12,  bxx, bz - 0.18, rail);
+
+// --- Chi tiết mặt tiền tầng 2 ---
+// GIAN PHẢI (bên điều hòa): CỬA SỔ
+(function windowRight() {
+  const x = bayCx, wY = GF_H + 0.98;
+  box(1.2, 1.16, 0.06, M.frame, x, wY, 0.09, house);
+  box(1.02, 0.98, 0.05, M.glass, x, wY, 0.13, house);
+  box(0.05, 0.98, 0.07, M.frame, x, wY, 0.15, house);
+  box(1.02, 0.05, 0.07, M.frame, x, wY, 0.15, house);
+  box(1.26, 0.06, 0.12, M.parapet, x, wY - 0.62, 0.12, house);   // bệ cửa sổ
+})();
+// GIAN TRÁI: CỬA 2 CÁNH ra ban công (cao chạm sàn ban công)
+(function balconyDoor() {
+  const x = -bayCx, dY = GF_H + 0.95, DW = 1.25, DH = 1.35;
+  box(DW + 0.14, DH + 0.12, 0.06, M.frame, x, dY, 0.09, house);  // khung
+  box(DW, DH, 0.05, M.glass, x, dY, 0.13, house);                // 2 cánh kính
+  box(0.06, DH, 0.08, M.frame, x, dY, 0.15, house);              // đố giữa (chia 2 cánh)
+  box(DW, 0.06, 0.08, M.frame, x, dY + DH*0.24, 0.15, house);    // nan ngang
+  box(0.05, 0.2, 0.05, M.frame, x - 0.13, dY, 0.16, house);      // tay nắm 2 cánh
+  box(0.05, 0.2, 0.05, M.frame, x + 0.13, dY, 0.16, house);
+})();
+box(2.82, 0.72, 0.05, M.frame, -0.15, GF_H + 2.02, 0.06, house);  // viền biển
+box(2.7, 0.66, 0.08, M_sign, -0.15, GF_H + 2.02, 0.13, house);    // biển XUÂN 1989
+box(0.82, 0.32, 0.26, M.ac, pierCx - 0.55, GF_H + 2.0, 0.17, house); // điều hòa
+box(0.05, 0.3, 0.05, M.beam, pierCx - 0.55, GF_H + 1.72, 0.22, house);// giá đỡ
+
+// --- Tường chắn mái có lỗ thoáng ---
+box(HOUSE_W + 0.12, 0.14, 0.34, M.parapet, 0, TOP + 0.07, 0.06, house);
+box(HOUSE_W + 0.12, 0.1, 0.36, M.beam, 0, TOP + PARA_H, 0.06, house);
+const teeth = Math.floor(HOUSE_W / 0.28);
+for (let i = 0; i <= teeth; i++) {
+  const x = -HOUSE_W/2 + 0.14 + i * ((HOUSE_W-0.28) / teeth);
+  box(0.14, PARA_H - 0.24, 0.32, M.parapet, x, TOP + 0.14 + (PARA_H-0.24)/2, 0.07, house);
+}
+cyl(0.4, 0.4, 0.8, M.tank, pierCx - 0.8, TOP + 0.4, cz + 1.2, house, 14);
+
+// ============================================================
+//  ĐIỀU KHIỂN
+// ============================================================
+document.getElementById('toggleRoad').onchange = e => ground.visible   = e.target.checked;
+document.getElementById('toggleIn').onchange   = e => inLights.visible  = e.target.checked;
+document.getElementById('autoRotate').onchange = e => controls.autoRotate = e.target.checked;
+controls.autoRotateSpeed = 1.0;
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+(function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
