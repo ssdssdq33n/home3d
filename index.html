@@ -114,7 +114,7 @@ function makeSignTexture(text) {
   g.fillText(text, 256, 68);
   return new THREE.CanvasTexture(c);
 }
-const M_sign = new THREE.MeshStandardMaterial({ map: makeSignTexture('XUÂN 1989'), roughness: 0.92 });
+const M_sign = new THREE.MeshStandardMaterial({ map: makeSignTexture('HIHI 2002'), roughness: 0.92 });
 
 function box(w, h, d, mat, x, y, z, parent) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
